@@ -4,9 +4,8 @@
 
 Through RL (rule-based outcome reward), the 3B **base** LLM (both Qwen2.5-3b-base and Llama3.2-3b-base) develops reasoning and search engine calling abilities all on its own.
 
-Twitter thread: xxx
+Twitter thread: [link](); Full experiment log: [link](https://wandb.ai/peterjin/Search-R1-open)
 
-Full experiment log: [link](https://wandb.ai/uiuc-dmg/Search-R1-open/)
 
 The paper will be released soon!
 
