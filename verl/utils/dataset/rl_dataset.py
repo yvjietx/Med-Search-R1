@@ -131,6 +131,10 @@ class RLHFDataset(Dataset):
             prompt_with_chat_template = chat[0]['content']
         # prompt_with_chat_template = chat
 
+        # 调试打印语句
+        print(f"[DEBUG] RLHFDataset.__getitem__: self.max_prompt_length = {self.max_prompt_length}, type = {type(self.max_prompt_length)}")
+        print(f"[DEBUG] RLHFDataset.__getitem__: self.truncation = {self.truncation}, type = {type(self.truncation)}")
+
         input_ids, attention_mask = verl_F.tokenize_and_postprocess_data(prompt=prompt_with_chat_template,
                                                                          tokenizer=self.tokenizer,
                                                                          max_length=self.max_prompt_length,

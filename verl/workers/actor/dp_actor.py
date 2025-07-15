@@ -204,6 +204,10 @@ class DataParallelPPOActor(BasePPOActor):
         # make sure we are in training mode
         self.actor_module.train()
 
+        # 打印 state_masking 的实际值
+        print(f"[DEBUG_ACTOR] self.config.state_masking in update_policy: {self.config.state_masking}")
+        print(f"[DEBUG_ACTOR] type of self.config.state_masking: {type(self.config.state_masking)}")
+
         assert self.config.ppo_mini_batch_size % self.config.ppo_micro_batch_size == 0
         self.gradient_accumulation = self.config.ppo_mini_batch_size // self.config.ppo_micro_batch_size
         temperature = data.meta_info['temperature']  # temperature must be in the data.meta_info to avoid slient error
@@ -213,6 +217,10 @@ class DataParallelPPOActor(BasePPOActor):
             select_keys.append('loss_mask')
         if self.config.use_kl_loss:
             select_keys.append('ref_log_prob')
+        
+        # 打印将要选择的键
+        print(f"[DEBUG_ACTOR] select_keys: {select_keys}")
+        
         batch = data.select(batch_keys=select_keys).batch
 
         # Split to make minibatch iterator for updating the actor

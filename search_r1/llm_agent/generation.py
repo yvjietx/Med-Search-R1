@@ -21,6 +21,7 @@ class GenerationConfig:
     no_think_rl: bool=False
     search_url: str = None
     topk: int = 3
+    do_search_tool: bool = True
 
 class LLMGenerationManager:
     def __init__(
@@ -251,7 +252,7 @@ class LLMGenerationManager:
 
             # Execute in environment and process observations
             next_obs, dones, valid_action, is_search = self.execute_predictions(
-                responses_str, self.tokenizer.pad_token, active_mask
+                responses_str, self.tokenizer.pad_token, active_mask, do_search=self.config.do_search_tool
             )
             
             curr_active_mask = torch.tensor([not done for done in dones], dtype=torch.bool)
@@ -360,7 +361,7 @@ class LLMGenerationManager:
             envs: List of environment instances
             predictions: List of action predictions
             pad_token: Token to use for padding
-            
+        
         Returns:
             List of observation strings
         """
@@ -401,7 +402,7 @@ If I want to give the final answer, I should put the answer between <answer> and
                     is_search.append(0)
             
         assert len(search_results) == 0
-            
+        
         return next_obs, dones, valid_action, is_search
 
     def postprocess_predictions(self, predictions: List[Any]) -> Tuple[List[int], List[bool]]:
@@ -444,7 +445,7 @@ If I want to give the final answer, I should put the answer between <answer> and
             search results which is concatenated into a string
         """
         results = self._batch_search(queries)['result']
-        
+
         return [self._passages2string(result) for result in results]
 
     def _batch_search(self, queries):
@@ -456,6 +457,32 @@ If I want to give the final answer, I should put the answer between <answer> and
         }
         
         return requests.post(self.config.search_url, json=payload).json()
+        # try:
+        #     response = requests.post(self.config.search_url, json=payload, timeout=20) # Add timeout
+        #     response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+        #     return response.json()
+        # except requests.exceptions.HTTPError as http_err:
+        #     print(f"HTTP error occurred: {http_err}")
+        #     print(f"Response content: {response.content}")
+        #     # Potentially return a default error structure or re-raise
+        #     # For now, let's re-raise to make the failure explicit, or handle as needed
+        #     raise
+        # except requests.exceptions.ConnectionError as conn_err:
+        #     print(f"Connection error occurred: {conn_err}")
+        #     raise
+        # except requests.exceptions.Timeout as timeout_err:
+        #     print(f"Timeout error occurred: {timeout_err}")
+        #     raise
+        # except requests.exceptions.RequestException as req_err:
+        #     print(f"An unexpected error occurred with the request: {req_err}")
+        #     print(f"Response content if available: {response.content if 'response' in locals() else 'No response object'}")
+        #     raise
+        # except requests.exceptions.JSONDecodeError as json_err:
+        #     print(f"JSONDecodeError occurred: {json_err}")
+        #     print(f"Response content that failed to decode: {response.content}")
+        #     # Return a structured error or re-raise depending on desired behavior
+        #     # Example: return {"error": "Failed to decode JSON", "content": response.text}
+        #     raise # Re-raise to keep existing behavior, or handle more gracefully
 
     def _passages2string(self, retrieval_result):
         format_reference = ''

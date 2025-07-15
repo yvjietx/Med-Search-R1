@@ -231,9 +231,19 @@ def tokenize_and_postprocess_data(prompt: str,
     """
     input_data is the output from tokenizer.
     """
-    assert truncation in ['left', 'right', 'error']
+    # 支持更多的截断选项
+    valid_truncation_options = ['left', 'right', 'error', 'longest_first', 'do_not_truncate']
+    
+    if truncation not in valid_truncation_options:
+        print(f"Warning: Unknown truncation method '{truncation}', defaulting to 'right'")
+        truncation = 'right'
 
-    input_data = tokenizer(prompt, return_tensors='pt', add_special_tokens=False)
+    input_data = tokenizer(prompt, 
+                          return_tensors='pt', 
+                          add_special_tokens=False,
+                          # 如果有特殊模型截断方法，优先使用它们
+                          truncation=True if truncation not in ['error', 'do_not_truncate'] else False,
+                          max_length=max_length if truncation not in ['error', 'do_not_truncate'] else None)
 
     input_ids = input_data['input_ids']
     attention_mask = input_data['attention_mask']
@@ -252,16 +262,24 @@ def tokenize_and_postprocess_data(prompt: str,
                                                 left_pad=left_pad)
     elif sequence_length > max_length:
         if truncation == 'left':
-            # actually, left truncation may not be reasonable
+            # 左截断
             input_ids = input_ids[:, -max_length:]
             attention_mask = attention_mask[:, -max_length:]
-        elif truncation == 'right':
+        elif truncation == 'right' or truncation == 'longest_first':
+            # 右截断或者从最长开始截断(对单序列而言效果相同)
             input_ids = input_ids[:, :max_length]
             attention_mask = attention_mask[:, :max_length]
+        elif truncation == 'do_not_truncate':
+            # 不截断，保持原样
+            pass
         elif truncation == 'error':
+            # 如果用户明确要求报错
             raise NotImplementedError(f'{sequence_length=} is larger than {max_length=}')
         else:
-            raise NotImplementedError(f'Unknown truncation method {truncation}')
+            # 默认右截断
+            print(f"Fallback: Unknown truncation method '{truncation}', using 'right' truncation")
+            input_ids = input_ids[:, :max_length]
+            attention_mask = attention_mask[:, :max_length]
 
     return input_ids, attention_mask
 

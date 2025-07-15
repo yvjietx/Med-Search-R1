@@ -1,58 +1,58 @@
 data:
-  tokenizer: null
-  train_files: ~/data/rlhf/gsm8k/train.parquet
-  val_files: ~/data/rlhf/gsm8k/test.parquet
-  train_data_num: null
-  val_data_num: null
-  prompt_key: prompt
-  max_prompt_length: 512
-  max_response_length: 512
-  max_start_length: 256
-  max_obs_length: 512
-  train_batch_size: 1024
-  val_batch_size: 1312
-  return_raw_input_ids: False  # This should be set to true when the tokenizer between policy and rm differs
-  return_raw_chat: False
-  shuffle_train_dataloader: True
+  tokenizer: null  # 默认使用模型自带 tokenizer
+  train_files: /home/yvjie/SEARCH-R1/data/medqa_search/train.parquet  # 训练数据路径
+  val_files: /home/yvjie/SEARCH-R1/data/medqa_search/test.parquet  # 验证数据路径
+  train_data_num: null  # 限制训练数据数量，null 表示使用全部
+  val_data_num: null  # 限制验证数据数量，null 表示使用全部
+  prompt_key: prompt  # prompt 字段在数据中的键
+  max_prompt_length: 256  # prompt 最大 token 长度
+  max_response_length: 256  # response 最大 token 长度
+  max_start_length: 256  # 启动状态最大长度
+  max_obs_length: 512  # 可观察状态最大长度
+  train_batch_size: 32  # 训练批量大小（过大可能 OOM）
+  val_batch_size: 64  # 验证批量大小
+  return_raw_input_ids: False  # 如果 policy 和 reward model 的 tokenizer 不一致，设为 True
+  return_raw_chat: False  # 是否返回原始对话格式
+  shuffle_train_dataloader: True  # 是否对训练集打乱顺序
 
 actor_rollout_ref:
-  hybrid_engine: True
+  hybrid_engine: True   # 启用混合推理引擎（如 vLLM + PyTorch
   model:
-    path: ~/models/deepseek-llm-7b-chat
-    external_lib: null
-    override_config: { }
-    enable_gradient_checkpointing: False
-    use_remove_padding: False
+    path: /home/yvjie/models/Qwen/Qwen2.5-0.5B  # 建议将模型设置为本地已下载模型，保证RL的正常运行
+    external_lib: null  # 是否使用自定义外部库
+    override_config: { }  # 覆盖 transformers 模型配置
+    enable_gradient_checkpointing: False  # 是否启用梯度检查点
+    use_remove_padding: False   # 是否启用 padding 去除优化
   actor:
-    strategy: fsdp  # This is for backward-compatibility
-    ppo_mini_batch_size: 256
-    ppo_micro_batch_size: 64
-    use_dynamic_bsz: False
-    ppo_max_token_len_per_gpu: 16384 # n * ${data.max_prompt_length} + ${data.max_response_length}
-    grad_clip: 1.0
-    state_masking: False
-    clip_ratio: 0.2
-    entropy_coeff: 0.001
-    use_kl_loss: False # True for GRPO
+    strategy: fsdp  # This is for backward-compatibility 使用 Fully Sharded Data Parallel
+    ppo_mini_batch_size: 64   # PPO 小批量更新时的批次大小
+    ppo_micro_batch_size: 64    # 每个 forward 的微批大小
+    use_dynamic_bsz: False    # 是否动态调整 batch size
+    ppo_max_token_len_per_gpu: 16384 # n * ${data.max_prompt_length} + ${data.max_response_length}   单卡最大 token 长度
+    grad_clip: 1.0    # 梯度裁剪阈值
+    state_masking: False    # 是否使用状态 mask
+    clip_ratio: 0.2   # PPO 策略更新裁剪比
+    entropy_coeff: 0.001    # PPO 中的 entropy 奖励系数
+    use_kl_loss: True # True for GRPO
     kl_loss_coef: 0.001 # for grpo
-    kl_loss_type: low_var_kl # for grpo
-    ppo_epochs: 1
-    shuffle: False
-    ulysses_sequence_parallel_size: 1 # sp size
+    kl_loss_type: low_var_kl # for grpo   KL loss 类型（支持 low_var_kl / normal_kl）
+    ppo_epochs: 1   # PPO 训练的 epoch 数
+    shuffle: False    # 是否在 actor 中打乱 batch
+    ulysses_sequence_parallel_size: 1   # sp size  序列并行设置
     optim:
       lr: 1e-6
-      lr_warmup_steps_ratio: 0.  # the total steps will be injected during runtime
+      lr_warmup_steps_ratio: 0.  # the total steps will be injected during runtime  # warmup 步骤比例
       min_lr_ratio: null   # only useful for warmup with cosine
       warmup_style: constant  # select from constant/cosine
       total_training_steps: -1  # must be override by program
     fsdp_config:
       wrap_policy:
         # transformer_layer_cls_to_wrap: None
-        min_num_params: 0
-      param_offload: False
-      grad_offload: False
-      optimizer_offload: False
-      fsdp_size: -1
+        min_num_params: 0   # FSDP 包装策略
+      param_offload: False    # 参数是否卸载到 CPU
+      grad_offload: False     # 梯度是否卸载到 CPU
+      optimizer_offload: False    # 优化器状态是否卸载
+      fsdp_size: -1   # 分组 size（自动）
   ref:
     fsdp_config:
       param_offload: False
@@ -60,7 +60,7 @@ actor_rollout_ref:
         # transformer_layer_cls_to_wrap: None
         min_num_params: 0
       fsdp_size: -1
-    log_prob_micro_batch_size: 128
+    log_prob_micro_batch_size: 64
     log_prob_use_dynamic_bsz: ${actor_rollout_ref.actor.use_dynamic_bsz}
     log_prob_max_token_len_per_gpu: ${actor_rollout_ref.actor.ppo_max_token_len_per_gpu}
     ulysses_sequence_parallel_size: ${actor_rollout_ref.actor.ulysses_sequence_parallel_size} # sp size
@@ -73,19 +73,19 @@ actor_rollout_ref:
     response_length: ${data.max_response_length}
     # for vllm rollout
     dtype: bfloat16 # should align with FSDP
-    gpu_memory_utilization: 0.5
-    ignore_eos: False
-    enforce_eager: True
-    free_cache_engine: True
-    load_format: dummy_dtensor
-    tensor_model_parallel_size: 2
-    max_num_batched_tokens: 8192
-    max_num_seqs: 1024
+    gpu_memory_utilization: 0.8
+    ignore_eos: False   # 是否忽略 EOS
+    enforce_eager: True    # 强制使用 eager 模式
+    free_cache_engine: True   # 自动释放 cache
+    load_format: dummy_dtensor    # 加载格式
+    tensor_model_parallel_size: 2   # 模型并行设置（单卡应为 1）
+    max_num_batched_tokens: 8192    # 最大 batch token 数
+    max_num_seqs: 1024    # 最大序列数
     log_prob_micro_batch_size: 128
     log_prob_use_dynamic_bsz: ${actor_rollout_ref.actor.use_dynamic_bsz}
     log_prob_max_token_len_per_gpu: ${actor_rollout_ref.actor.ppo_max_token_len_per_gpu}
     # for hf rollout
-    do_sample: True
+    do_sample: True   # 启用随机采样
     # number of responses (i.e. num sample times)
     n: 1 # > 1 for grpo
     n_agent: 1 # different here used for agent tasks only
@@ -99,7 +99,7 @@ critic:
     warmup_style: constant  # select from constant/cosine
     total_training_steps: -1  # must be override by program
   model:
-    path: ~/models/deepseek-llm-7b-chat
+    path: /home/yvjie/models/Qwen/Qwen2.5-0.5B
     tokenizer_path: ${actor_rollout_ref.model.path}
     override_config: { }
     external_lib: ${actor_rollout_ref.model.external_lib}
@@ -130,7 +130,7 @@ reward_model:
   strategy: fsdp
   model:
     input_tokenizer: ${actor_rollout_ref.model.path}  # set this to null if the chat template is identical
-    path: ~/models/FsfairX-LLaMA3-RM-v0.1
+    path: /home/yvjie/models/Qwen/Qwen2.5-0.5B
     external_lib: ${actor_rollout_ref.model.external_lib}
     use_remove_padding: False
     fsdp_config:
@@ -147,31 +147,37 @@ retriever:
   topk: 3
 
 algorithm:
-  gamma: 1.0
-  lam: 1.0
-  adv_estimator: gae
-  no_think_rl: False
-  kl_penalty: kl  # how to estimate kl divergence
+  gamma: 1.0  # 折扣因子
+  lam: 1.0  # GAE 参数
+  adv_estimator: grpo  # 优势函数估计方式
+  no_think_rl: False  # 启用 RL 模式而非思维链模式
+  kl_penalty: kl  # KL 类型惩罚
   kl_ctrl:
-    type: fixed
+    type: fixed  # 固定 KL 系数
     kl_coef: 0.001
   state_masking:
-    start_state_marker: "<information>"
-    end_state_marker: "</information>"
+    start_state_marker: "<information>"  # 状态起始标记
+    end_state_marker: "</information>"  # 状态结束标记
 
 trainer:
-  total_epochs: 30
-  total_training_steps: null
-  project_name: verl_examples
-  experiment_name: gsm8k
-  logger: [ 'console', 'wandb' ]
+  total_epochs: 1
+  total_training_steps: 100
+  project_name: verl_medqa
+  experiment_name: medqa_search
+  logger: ['wandb']
+  log_every_n_steps: 1  # 每步记录
+  log_model_gradients: true  # 记录梯度
+  log_model_parameters: true  # 记录参数
+  log_validation_predictions: true  # 记录验证集预测
+  wandb_watch: all  # 监控所有模型
+  wandb_log_model: true  # 记录模型检查点
   nnodes: 1
   n_gpus_per_node: 8
   save_freq: -1
-  test_freq: -1
+  test_freq: 2
   critic_warmup: 0
-  default_hdfs_dir: ~/experiments/gsm8k/ppo/${trainer.experiment_name}
-  default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}
+  default_hdfs_dir: /home/yvjie/SEARCH-R1/experiments/medqa_search/grpo/${trainer.experiment_name}    # HDFS 保存路径
+  default_local_dir: checkpoints/${trainer.project_name}/${trainer.experiment_name}   # 本地保存路径  
 
 max_turns: 10
-do_search: true
+do_search: True

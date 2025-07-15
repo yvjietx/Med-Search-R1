@@ -199,6 +199,7 @@ class BM25Retriever(BaseRetriever):
             item_result, item_score = self._search(query, num, True)
             results.append(item_result)
             scores.append(item_score)
+
         if return_score:
             return results, scores
         else:
@@ -336,6 +337,7 @@ def retrieve_endpoint(request: QueryRequest):
     """
     if not request.topk:
         request.topk = config.retrieval_topk  # fallback to default
+
 
     # Perform batch retrieval
     results, scores = retriever.batch_search(

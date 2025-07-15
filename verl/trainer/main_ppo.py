@@ -17,14 +17,14 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 
 from verl import DataProto
 import torch
-from verl.utils.reward_score import qa_em
+from verl.utils.reward_score import med
 from verl.trainer.ppo.ray_trainer import RayPPOTrainer
 import re
 import numpy as np
 
 def _select_rm_score_fn(data_source):
-    if data_source in ['nq', 'triviaqa', 'popqa', 'hotpotqa', '2wikimultihopqa', 'musique', 'bamboogle']:
-        return qa_em.compute_score_em
+    if data_source in ['medqa']:
+        return med.compute_score
     else:
         raise NotImplementedError
 
@@ -118,6 +118,7 @@ def main_task(config):
     # print initial config
     from pprint import pprint
     from omegaconf import OmegaConf
+    # print config
     pprint(OmegaConf.to_container(config, resolve=True))  # resolve=True will eval symbol values
     OmegaConf.resolve(config)
 

@@ -42,7 +42,32 @@ class Tracking(object):
             WANDB_API_KEY = os.environ.get("WANDB_API_KEY", None)
             if WANDB_API_KEY:
                 wandb.login(key=WANDB_API_KEY)
-            wandb.init(project=project_name, name=experiment_name, config=config)
+            
+            # 配置 wandb
+            wandb_config = {
+                'project': project_name,
+                'name': experiment_name,
+                'config': config,
+                'settings': wandb.Settings(
+                    start_method="thread",
+                    _disable_stats=True
+                )
+            }
+            
+            # 显式确保 'watch' 和 'log_model' 不会作为顶层参数传递给 wandb.init()
+            # 这些功能应该通过环境变量或 wandb.watch() / wandb.log_artifact() 单独处理
+            if 'watch' in wandb_config:
+                del wandb_config['watch']
+            if 'log_model' in wandb_config:
+                del wandb_config['log_model']
+            
+            wandb.init(**wandb_config)
+            
+            # 如果配置了 watch，提示用户在模型实例化后手动调用 wandb.watch()
+            if config and 'trainer' in config and config['trainer'].get('wandb_watch') and hasattr(wandb, 'watch') and callable(wandb.watch):
+                print(f"W&B: wandb.watch() is configured via config.trainer.wandb_watch='{config['trainer']['wandb_watch']}'.")
+                print(f"W&B: Please ensure wandb.watch(model) is called after model initialization to enable automatic logging of gradients and parameters.")
+
             self.logger['wandb'] = wandb
 
         if 'mlflow' in default_backend:
@@ -59,6 +84,12 @@ class Tracking(object):
     def log(self, data, step, backend=None):
         for default_backend, logger_instance in self.logger.items():
             if backend is None or default_backend in backend:
+                # 对于 wandb，确保所有指标都被记录
+                if default_backend == 'wandb':
+                    # 由于这里没有访问模型的方法，我们移除这部分代码
+                    # 这些功能将通过 wandb.watch() 自动完成
+                    pass
+                
                 logger_instance.log(data=data, step=step)
 
 
